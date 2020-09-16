@@ -1,0 +1,177 @@
+//DOM Selectors
+const cartBtn = document.querySelector('.cart-btn');
+const closeCartBtn = document.querySelector('.close-cart');
+const clearCartBtn = document.querySelector('.clear-cart');
+const cartDOM = document.querySelector('.cart');
+const cartOverlay = document.querySelector('.cart-overlay');
+const cartItems = document.querySelector('.cart-items');
+const cartTotal = document.querySelector('.cart-total');
+const cartContent = document.querySelector('.cart-content');
+const productsDOM = document.querySelector('.products-center');
+const btns = document.querySelectorAll('.bag-btn');
+
+
+//Useful Functions
+
+//Capitalize Letters Func
+const capitalizeLetters = (str) => {
+    const strArr = str.toLowerCase().split(' ');
+    for (let i = 0; i < strArr.length; i++) {
+        strArr[i] = strArr[i].substring(0, 1).toUpperCase() + strArr[i].substring(1);
+    }
+    return strArr.join(' ');
+}
+
+//Main Cart
+let cart = [];
+
+//Buttons
+let buttonsDOM = [];
+
+//-----------Classes-------------
+
+//Getting the products
+class Products {
+    async getProducts() {
+
+        try {
+            let res = await fetch('products.json');
+            let data = await res.json();
+
+            let products = data.items;
+            products = products.map((item) => {
+                const { title, price } = item.fields;
+                const { id } = item.sys;
+                const image = item.fields.image.fields.file.url;
+
+                return { title, price, id, image }
+            });
+            return products
+        } catch (e) {
+            console.log(e);
+        }
+    }
+}
+
+//Display the products
+class UI {
+    displayProducts(products) {
+        let result = '';
+
+        products.forEach(product => {
+            result += `
+            <article class="product">
+            <div class="img-container">
+                <img src="${product.image}" class="product-img">
+                <button class="bag-btn" data-id="${product.id}">
+                    <i class="fas fa-shopping-cart"></i>
+                    Add To Cart
+                </button>
+            </div>
+            <h3>${capitalizeLetters(product.title)}</h3>
+            <h4>${product.price}</h4>
+        </article>
+            `
+        });
+        productsDOM.innerHTML = result;
+    }
+
+    getBagButtons() {
+        const buttons = [...document.querySelectorAll('.bag-btn')];
+
+        buttonsDOM = buttons;
+
+
+        buttons.forEach(button => {
+            let id = button.dataset.id;
+            let inCart = cart.find(item => item.id === id);
+            if (inCart) {
+                button.innerText = 'In Cart';
+                button.disabled = true;
+            }
+
+            button.addEventListener('click', event => {
+                event.target.innerText = 'In Cart';
+                event.target.disabled = true;
+
+                //Get the product
+                let cartItem = { ...Storage.getProduct(id), amount: 1 }
+
+                cart = [...cart, cartItem];
+
+                Storage.saveCart(cart);
+
+                this.setCartValues(cart);
+
+                this.addCartItem(cartItem);
+
+                this.showCart();
+            });
+        });
+    }
+    setCartValues(cart) {
+        let tempTotal = 0;
+        let itemsTotal = 0;
+
+        cart.map(item => {
+            tempTotal += (item.price * item.amount);
+            itemsTotal += item.amount;
+        })
+
+        cartTotal.innerText = parseFloat(tempTotal.toFixed(2));
+        cartItems.innerText = itemsTotal;
+
+    }
+    addCartItem(item) {
+        const div = document.createElement('div');
+        div.classList.add('cart-item');
+        div.innerHTML = `
+                    <img src="${item.image}" alt="product">
+                    <div class="cart-item-info">
+                        <h4>${item.title}</h4>
+                        <h4>${item.price}</h4>
+                        <span class="remove-item" data-id=${item.ids}>Remove Item</span>
+                    </div>
+                    <div>
+                        <i class="fas fa-chevron-up" data-id=${item.id}></i>
+                        <p class="item-amount">${item.amount}</p>
+                        <i class="fas fa-chevron-down" data-id=${item.id}></i>
+                    </div>
+        `;
+
+        cartContent.appendChild(div);
+
+    }
+    showCart() {
+        cartOverlay.classList.add('transparentBcg');
+        cartDOM.classList.add('showCart')
+    }
+    //2;42;16
+}
+
+//Local Storage
+class Storage {
+    static saveProducts(products) {
+        localStorage.setItem('products', JSON.stringify(products));
+    }
+    static getProduct(id) {
+        let products = JSON.parse(localStorage.getItem('products'));
+
+        return products.find(product => product.id === id);
+    }
+    static saveCart(cart) {
+        localStorage.setItem('cart', JSON.stringify(cart));
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ui = new UI();
+    const products = new Products();
+
+    products.getProducts().then(products => {
+        ui.displayProducts(products);
+        Storage.saveProducts(products);
+    }).then(() => {
+        ui.getBagButtons();
+    })
+})
